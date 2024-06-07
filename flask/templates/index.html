@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera Feed</title>
+    <style>
+        #arrow-up, #arrow-down, #arrow-left, #arrow-right {
+            position: absolute;
+            display: none;
+            font-size: 2em;
+            color: red;
+        }
+        #arrow-up { top: 10px; left: 50%; transform: translateX(-50%); }
+        #arrow-down { bottom: 10px; left: 50%; transform: translateX(-50%); }
+        #arrow-left { top: 50%; left: 10px; transform: translateY(-50%); }
+        #arrow-right { top: 50%; right: 10px; transform: translateY(-50%); }
+    </style>
+</head>
+<body>
+    <h1>Camera Feed</h1>
+    <img src="{{ url_for('video_feed') }}" width="640" height="480">
+    <div id="arrow-up">↑</div>
+    <div id="arrow-down">↓</div>
+    <div id="arrow-left">←</div>
+    <div id="arrow-right">→</div>
+
+    <script>
+        function updateArrows(controlSignals) {
+            document.getElementById('arrow-up').style.display = controlSignals.move_z > 0 ? 'block' : 'none';
+            document.getElementById('arrow-down').style.display = controlSignals.move_z < 0 ? 'block' : 'none';
+            document.getElementById('arrow-left').style.display = controlSignals.move_yaw < 0 ? 'block' : 'none';
+            document.getElementById('arrow-right').style.display = controlSignals.move_yaw > 0 ? 'block' : 'none';
+        }
+
+        async function fetchControlSignals() {
+            try {
+                const response = await fetch('{{ url_for('get_control_signals') }}');
+                const controlSignals = await response.json();
+                updateArrows(controlSignals);
+            } catch (error) {
+                console.error('Error fetching control signals:', error);
+            }
+        }
+
+        setInterval(fetchControlSignals, 1000);
+    </script>
+</body>
+</html>
