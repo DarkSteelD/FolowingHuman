@@ -90,7 +90,7 @@ try:
                     label = f"Person: {conf:.2f}"
                     cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-        # Print coordinates and calculate move for the largest box
+        # Calculate and print control signals if a person is detected
         if largest_box is not None:
             print(f"Largest box coordinates: {largest_box}")
             frame_height, frame_width = frame.shape[:2]
@@ -99,6 +99,8 @@ try:
             # Add the text to the frame
             control_text = f"move_x: {move_x:.2f}, move_y: {move_y:.2f}, move_z: {move_z:.2f}, move_yaw: {move_yaw:.2f}"
             cv2.putText(frame, control_text, (10, frame_height - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        else:
+            print("No person detected, no movement needed.")
 
         # Save the captured frame
         frame_filename = os.path.join('captured_frames', f'frame_{frame_count:04d}.jpg')
