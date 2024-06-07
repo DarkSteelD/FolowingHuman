@@ -7,7 +7,7 @@ import os
 model = YOLO('yolov8n.pt')  # You can choose 'yolov8n.pt', 'yolov8s.pt', etc., for different sizes
 
 # Open a connection to the webcam
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0)  # Change this if your webcam is not the first video device
 
 if not cap.isOpened():
     print("Error: Could not open video device.")
@@ -21,18 +21,42 @@ print("Press 'Ctrl+C' to stop capturing.")
 
 frame_count = 0
 
-def calculate_center_move(box, frame_width, frame_height):
-    x1, y1, x2, y2 = box
-    box_center_x = (x1 + x2) / 2
-    box_center_y = (y1 + y2) / 2
+def calculate_control_signal(bbox, image_width, image_height, K_p, target_height_ratio):
+    # Extract bounding box parameters
+    x_min, y_min, x_max, y_max = bbox
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    bbox_width = x_max - x_min
+    bbox_height = y_max - y_min
 
-    frame_center_x = frame_width / 2
-    frame_center_y = frame_height / 2
+    # Calculate FOV center
+    x_FOV = image_width / 2
+    y_FOV = image_height / 2
 
-    move_x = box_center_x - frame_center_x
-    move_y = box_center_y - frame_center_y
+    # Calculate errors
+    delta_x = x_center - x_FOV
+    delta_y = y_center - y_FOV
 
-    return move_x, move_y
+    # Calculate control signals for position
+    u_x = K_p * delta_y  # Adjust forward/backward based on vertical error
+    u_y = K_p * delta_x  # Adjust left/right based on horizontal error
+
+    # Calculate control signals for altitude
+    current_height_ratio = bbox_height / image_height
+    if current_height_ratio < target_height_ratio:
+        # If the person is not fully visible, we need to fly up
+        u_z = K_p * (target_height_ratio - current_height_ratio)
+    else:
+        u_z = 0  # No altitude adjustment needed
+
+    # Calculate control signals for yaw
+    u_yaw = K_p * delta_x  # Adjust yaw based on horizontal error
+
+    return u_x, u_y, u_z, u_yaw
+
+# Parameters for control signal calculation
+K_p = 0.1  # Proportional gain
+target_height_ratio = 0.75  # Target height ratio (e.g., 75% of the image height)
 
 try:
     while True:
@@ -70,11 +94,11 @@ try:
         if largest_box is not None:
             print(f"Largest box coordinates: {largest_box}")
             frame_height, frame_width = frame.shape[:2]
-            move_x, move_y = calculate_center_move(largest_box, frame_width, frame_height)
-            print(f"Move camera by x: {move_x}, y: {move_y} to center the largest frame")
+            move_x, move_y, move_z, move_yaw = calculate_control_signal(largest_box, frame_width, frame_height, K_p, target_height_ratio)
+            print(f"Control Signals: move_x = {move_x:.2f}, move_y = {move_y:.2f}, move_z = {move_z:.2f}, move_yaw = {move_yaw:.2f}")
             # Add the text to the frame
-            move_text = f"Move camera by x: {move_x:.2f}, y: {move_y:.2f} to center the largest frame"
-            cv2.putText(frame, move_text, (10, frame_height - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            control_text = f"move_x: {move_x:.2f}, move_y: {move_y:.2f}, move_z: {move_z:.2f}, move_yaw: {move_yaw:.2f}"
+            cv2.putText(frame, control_text, (10, frame_height - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
         # Save the captured frame
         frame_filename = os.path.join('captured_frames', f'frame_{frame_count:04d}.jpg')
