@@ -7,7 +7,7 @@ import os
 app = Flask(__name__)
 
 # Load the YOLOv8 model
-model = YOLO('yolov8n.pt')  # You can choose 'yolov8n.pt', 'yolov8s.pt', etc., for different sizes
+model = YOLO('yolov8n.pt')  # Ensure the model is trained for person, fire, and smoke
 
 # Try to open a connection to the available webcams
 def open_camera():
@@ -27,13 +27,29 @@ if not os.path.exists('static/captured_frames'):
 
 frame_count = 0
 control_signals = {'move_x': 0, 'move_y': 0, 'move_z': 0, 'move_yaw': 0}
+fire_detected = False
+smoke_detected = False
 
-def calculate_control_signal(bbox, image_width, image_height, K_p, target_height_ratio):
+# PID gains
+K_p = 0.05  # Reduced proportional gain
+K_i = 0.005  # Reduced integral gain
+K_d = 0.01  # Reduced derivative gain
+
+# Initialize PID control terms
+integral_x = 0
+integral_y = 0
+integral_z = 0
+previous_error_x = 0
+previous_error_y = 0
+previous_error_z = 0
+
+def calculate_control_signal(bbox, image_width, image_height, K_p, K_i, K_d, target_height_ratio):
+    global integral_x, integral_y, integral_z, previous_error_x, previous_error_y, previous_error_z
+
     # Extract bounding box parameters
     x_min, y_min, x_max, y_max = bbox
     x_center = (x_min + x_max) / 2
     y_center = (y_min + y_max) / 2
-    bbox_width = x_max - x_min
     bbox_height = y_max - y_min
 
     # Calculate FOV center
@@ -41,33 +57,50 @@ def calculate_control_signal(bbox, image_width, image_height, K_p, target_height
     y_FOV = image_height / 2
 
     # Calculate errors
-    delta_x = x_center - x_FOV
-    delta_y = y_center - y_FOV
+    error_x = x_center - x_FOV
+    error_y = y_center - y_FOV
+    error_z = target_height_ratio - (bbox_height / image_height)
 
-    # Calculate control signals for position
-    u_x = K_p * delta_y  # Adjust forward/backward based on vertical error
-    u_y = K_p * delta_x  # Adjust left/right based on horizontal error
+    # Proportional terms
+    P_x = K_p * error_x
+    P_y = K_p * error_y
+    P_z = K_p * error_z
 
-    # Calculate control signals for altitude
-    current_height_ratio = bbox_height / image_height
-    if current_height_ratio < target_height_ratio:
-        # If the person is not fully visible, we need to fly up
-        u_z = K_p * (target_height_ratio - current_height_ratio)
-    else:
-        u_z = 0  # No altitude adjustment needed
+    # Integral terms
+    integral_x += error_x
+    integral_y += error_y
+    integral_z += error_z
+    I_x = K_i * integral_x
+    I_y = K_i * integral_y
+    I_z = K_i * integral_z
 
-    # Calculate control signals for yaw
-    u_yaw = K_p * delta_x  # Adjust yaw based on horizontal error
+    # Derivative terms
+    D_x = K_d * (error_x - previous_error_x)
+    D_y = K_d * (error_y - previous_error_y)
+    D_z = K_d * (error_z - previous_error_z)
 
-    return u_x, u_y, u_z, u_yaw
+    # Calculate control signals
+    move_x = P_y + I_y + D_y  # Forward/backward movement
+    move_y = P_x + I_x + D_x  # Left/right movement
+    move_z = P_z + I_z + D_z  # Altitude adjustment
+    move_yaw = P_x + I_x + D_x  # Yaw adjustment
+
+    # Update previous errors for derivative calculation
+    previous_error_x = error_x
+    previous_error_y = error_y
+    previous_error_z = error_z
+
+    return move_x, move_y, move_z, move_yaw
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
 def gen():
-    global frame_count, control_signals
-    K_p = 0.1  # Proportional gain
+    global frame_count, control_signals, fire_detected, smoke_detected
+    K_p = 0.05  # Reduced proportional gain
+    K_i = 0.005  # Reduced integral gain
+    K_d = 0.01  # Reduced derivative gain
     target_height_ratio = 0.75  # Target height ratio (e.g., 75% of the image height)
 
     while True:
@@ -81,27 +114,43 @@ def gen():
         # Extract bounding boxes and class labels
         largest_box = None
         largest_area = 0
+        fire_detected = False
+        smoke_detected = False
+
         for r in results:
             boxes = r.boxes  # Boxes object for bbox outputs
             for box in boxes:
                 cls = box.cls  # Class id
+                x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box coordinates
+                conf = box.conf[0]  # Confidence score
+                area = (x2 - x1) * (y2 - y1)
+                
                 if int(cls) == 0:  # Class '0' is 'person' in COCO dataset
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box coordinates
-                    conf = box.conf[0]  # Confidence score
-                    area = (x2 - x1) * (y2 - y1)
                     if area > largest_area:
                         largest_area = area
                         largest_box = (x1, y1, x2, y2)
-
+                    
                     # Draw the bounding box
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     label = f"Person: {conf:.2f}"
                     cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                
+                elif int(cls) == 1:  # Class '1' is 'fire' (update class id as per the model)
+                    fire_detected = True
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                    label = f"Fire: {conf:.2f}"
+                    cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+                elif int(cls) == 2:  # Class '2' is 'smoke' (update class id as per the model)
+                    smoke_detected = True
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                    label = f"Smoke: {conf:.2f}"
+                    cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
         # Calculate and print control signals if a person is detected
         if largest_box is not None:
             frame_height, frame_width = frame.shape[:2]
-            move_x, move_y, move_z, move_yaw = calculate_control_signal(largest_box, frame_width, frame_height, K_p, target_height_ratio)
+            move_x, move_y, move_z, move_yaw = calculate_control_signal(largest_box, frame_width, frame_height, K_p, K_i, K_d, target_height_ratio)
             control_signals = {'move_x': move_x, 'move_y': move_y, 'move_z': move_z, 'move_yaw': move_yaw}
             # Add the control arrows to the frame
             if move_yaw < 0:
@@ -118,9 +167,15 @@ def gen():
             cv2.putText(frame, arrow_text, (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
             control_signals = {'move_x': 0, 'move_y': 0, 'move_z': 0, 'move_yaw': 0}
 
+        # Add fire and smoke alerts to the frame
+        if fire_detected:
+            cv2.putText(frame, "Fire Detected!", (10, frame_height - 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+        if smoke_detected:
+            cv2.putText(frame, "Smoke Detected!", (10, frame_height - 70), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
         # Save the captured frame
-        frame_filename = f'static/captured_frames/frame_{frame_count:04d}.jpg'
-        cv2.imwrite(frame_filename, frame)
+        # frame_filename = f'static/captured_frames/frame_{frame_count:04d}.jpg'
+        # cv2.imwrite(frame_filename, frame)
         frame_count += 1
 
         # Stream the frame
@@ -138,6 +193,11 @@ def video_feed():
 def get_control_signals():
     global control_signals
     return jsonify(control_signals)
+
+@app.route('/alerts')
+def get_alerts():
+    global fire_detected, smoke_detected
+    return jsonify({'fire_detected': fire_detected, 'smoke_detected': smoke_detected})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
