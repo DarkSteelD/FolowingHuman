@@ -24,12 +24,6 @@
             display: none;
             margin: 0 20px;
         }
-        #alerts-container {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 1.5em;
-            color: red;
-        }
     </style>
 </head>
 <body>
@@ -38,22 +32,18 @@
         <img id="video" src="{{ url_for('video_feed') }}">
     </div>
     <div id="arrows-container">
-        <span id="arrow-up" class="arrow">↑</span>
-        <span id="arrow-down" class="arrow">↓</span>
         <span id="arrow-left" class="arrow">←</span>
         <span id="arrow-right" class="arrow">→</span>
-    </div>
-    <div id="alerts-container">
-        <p id="fire-alert" style="display: none;">Fire Detected!</p>
-        <p id="smoke-alert" style="display: none;">Smoke Detected!</p>
+        <span id="arrow-up" class="arrow">↑</span>
+        <span id="arrow-down" class="arrow">↓</span>
     </div>
 
     <script>
         function updateArrows(controlSignals) {
-            document.getElementById('arrow-up').style.display = controlSignals.move_z > 0 ? 'inline' : 'none';
-            document.getElementById('arrow-down').style.display = controlSignals.move_z < 0 ? 'inline' : 'none';
-            document.getElementById('arrow-left').style.display = controlSignals.move_yaw < 0 ? 'inline' : 'none';
-            document.getElementById('arrow-right').style.display = controlSignals.move_yaw > 0 ? 'inline' : 'none';
+            document.getElementById('arrow-left').style.display = controlSignals.move_y < 0 ? 'inline' : 'none';
+            document.getElementById('arrow-right').style.display = controlSignals.move_y > 0 ? 'inline' : 'none';
+            document.getElementById('arrow-up').style.display = controlSignals.move_x > 0 ? 'inline' : 'none';
+            document.getElementById('arrow-down').style.display = controlSignals.move_x < 0 ? 'inline' : 'none';
         }
 
         async function fetchControlSignals() {
@@ -66,22 +56,7 @@
             }
         }
 
-        function updateAlerts(alerts) {
-            document.getElementById('fire-alert').style.display = alerts.fire_detected ? 'block' : 'none';
-            document.getElementById('smoke-alert').style.display = alerts.smoke_detected ? 'block' : 'none';
-        }
-
-        async function fetchAlerts() {
-            try {
-                const response = await fetch('{{ url_for("get_alerts") }}');
-                const alerts = await response.json();
-                updateAlerts(alerts);
-            } catch (error) {
-                console.error('Error fetching alerts:', error);
-            }
-        }
-
         setInterval(fetchControlSignals, 1000);
-        setInterval(fetchAlerts, 1000);
     </script>
 </body>
+</html>
