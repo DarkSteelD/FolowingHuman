@@ -7,7 +7,7 @@ if not os.path.exists('captured_frames'):
     os.makedirs('captured_frames')
 
 # Open a connection to the webcam (0 is the default ID for the first camera)
-cap = cv2.VideoCapture(2)
+cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
     print("Error: Could not open video device.")

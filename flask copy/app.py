@@ -4,8 +4,7 @@ from ultralytics import YOLO
 
 app = Flask(__name__)
 
-# Load the YOLOv8 model trained for person detection (COCO dataset)
-model = YOLO('yolov8n.pt')  # Use the YOLOv8 model file
+model = YOLO('yolov8n.pt')  
 
 def open_camera():
     for i in range(4):
@@ -15,7 +14,7 @@ def open_camera():
     print("Error: Could not open any video device.")
     exit()
 
-cap = open_camera()
+cap = cap = cv2.VideoCapture(0)
 
 frame_count = 0
 control_signals = {'move_x': 0, 'move_y': 0, 'move_z': 0}
