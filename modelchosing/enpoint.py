@@ -7,7 +7,13 @@ from ultralytics import YOLO
 import threading
 
 app = Flask(__name__)
-model = YOLO('yolov5s')  # Инициализируйте YOLO с нужной моделью (замените на нужную)
+model = YOLO("yolov9c.yaml")
+
+# Build a YOLOv9c model from pretrained weight
+model = YOLO("yolov9c.pt")
+
+# Display model information (optional)
+model.info() # Инициализируйте YOLO с нужной моделью (замените на нужную)
 
 # Глобальные переменные для последнего изображения и боксов
 last_image = None
