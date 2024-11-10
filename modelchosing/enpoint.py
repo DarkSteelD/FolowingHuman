@@ -1,4 +1,3 @@
-
 from flask import Flask, request
 import cv2
 import numpy as np
@@ -7,13 +6,10 @@ from ultralytics import YOLO
 import threading
 
 app = Flask(__name__)
-model = YOLO("yolov9c.yaml")
 
-# Build a YOLOv9c model from pretrained weight
+# Инициализируем модель YOLO
 model = YOLO("yolov9c.pt")
-
-# Display model information (optional)
-model.info() # Инициализируйте YOLO с нужной моделью (замените на нужную)
+model.info()
 
 # Глобальные переменные для последнего изображения и боксов
 last_image = None
@@ -27,21 +23,23 @@ def detect_and_draw(image):
     # Выполняем детекцию объектов
     results = model(cv_image)
     boxes = []
-    
+
     for box in results[0].boxes:
-        x_min, y_min, x_max, y_max = map(int, box[:4])
+        x_min, y_min, x_max, y_max = map(int, box.xyxy[0])  # Используем box.xyxy[0]
         width = x_max - x_min
         height = y_max - y_min
-        boxes.append({"x": x_min, "y": y_min, "width": width, "height": height})
-    
+        class_id = int(box.cls[0])  # Получаем индекс класса
+        class_name = model.names[class_id]  # Получаем имя класса
+        
+        boxes.append({"x": x_min, "y": y_min, "width": width, "height": height, "class": class_name})
+
+        # Рисуем боксы на изображении
+        cv2.rectangle(cv_image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+        cv2.putText(cv_image, class_name, (x_min, y_min - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36,255,12), 2)
+
     # Сохраняем последнее изображение и боксы
     last_image = cv_image
     last_boxes = boxes
-
-    # Рисуем боксы на изображении
-    for box in boxes:
-        x, y, width, height = box['x'], box['y'], box['width'], box['height']
-        cv2.rectangle(cv_image, (x, y), (x + width, y + height), (0, 255, 0), 2)
 
     return cv_image
 
