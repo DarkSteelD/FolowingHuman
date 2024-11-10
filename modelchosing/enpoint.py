@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 from ultralytics import YOLO
-import gradio as gr
 import threading
 
 # Инициализируем модель YOLO
@@ -31,11 +30,14 @@ def detect_and_draw(image):
         class_id = int(box.cls[0])  # Получаем индекс класса
         class_name = model.names[class_id]  # Получаем имя класса
 
-        # Если класс - 'person', сохраняем его для центрирования
+        # Если класс - 'person', сохраняем его для центрирования и рисуем бокс
         if class_name == target_class:
             target_box = (x_min, y_min, x_max, y_max)
+            # Рисуем рамку для 'person'
+            cv2.rectangle(cv_image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
             break  # Останавливаемся на первом найденном 'person'
         
+        # Сохраняем координаты боксов всех объектов
         boxes.append({"x": x_min, "y": y_min, "width": width, "height": height})
     
     if target_box:
@@ -52,10 +54,10 @@ def detect_and_draw(image):
     last_image = cv_image
     last_boxes = boxes
 
-    # Рисуем боксы на изображении
+    # Рисуем боксы для всех объектов, если нужно
     for box in boxes:
         x, y, width, height = box['x'], box['y'], box['width'], box['height']
-        cv2.rectangle(cv_image, (x, y), (x + width, y + height), (0, 255, 0), 2)
+        cv2.rectangle(cv_image, (x, y), (x + width, y + height), (255, 0, 0), 2)
 
     return cv_image
 
