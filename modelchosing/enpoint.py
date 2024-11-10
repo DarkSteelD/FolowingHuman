@@ -60,7 +60,7 @@ def detect_and_draw(image):
             direction = 0  # Прямо
         elif box_center_x < frame_center_x:
             direction = 3  # Влево
-        else:
+        elif box_center_x > frame_center_x:
             direction = 2  # Вправо
     else:
         direction = 1 # назад
