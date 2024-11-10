@@ -58,12 +58,12 @@ def detect_and_draw(image):
         if abs(box_center_x - frame_center_x) < cv_image.shape[1] * 0.1:
             # Если 'person' в центре по горизонтали
             direction = 0  # Прямо
-        elif box_center_x < frame_center_x:
+        elif box_center_x < frame_center_x - frame_center_x // 2:
             direction = 3  # Влево
-        elif box_center_x > frame_center_x:
+        elif box_center_x > frame_center_x + frame_center_x // 2:
             direction = 2  # Вправо
-    else:
-        direction = 1 # назад
+        else:
+            direction = 1 # назад
         # Вы можете также добавить проверку расстояния до 'person' по вертикали (box_center_y) для определения 'назад'
 
     # Сохраняем последнее изображение и боксы
