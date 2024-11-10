@@ -45,7 +45,7 @@ def detect_and_draw(image):
 
         # Сохраняем координаты боксов всех объектов
         boxes.append({"x": x_min, "y": y_min, "width": width, "height": height, "class": class_name})
-
+        print({"x": x_min, "y": y_min, "width": width, "height": height, "class": class_name})
     direction = 1  # По умолчанию - назад
 
     if target_box:
