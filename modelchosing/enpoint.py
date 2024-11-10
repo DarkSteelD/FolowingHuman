@@ -23,7 +23,7 @@ def detect_and_draw(image):
     # Выполняем детекцию объектов
     results = model(cv_image)
     boxes = []
-    target_class = 'person'
+    target_class = 'cup'
     target_box = None
 
     # Проходим по всем обнаруженным объектам
@@ -62,7 +62,8 @@ def detect_and_draw(image):
             direction = 3  # Влево
         else:
             direction = 2  # Вправо
-
+    else:
+        direction = 1 # назад
         # Вы можете также добавить проверку расстояния до 'person' по вертикали (box_center_y) для определения 'назад'
 
     # Сохраняем последнее изображение и боксы
